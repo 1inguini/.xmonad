@@ -1,3 +1,9 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Main where
 
 import Control.Monad
@@ -7,6 +13,7 @@ import Data.Bits ((.|.))
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Tuple (swap)
 import System.Exit
 import XMonad hiding (Tall)
 -- import XMonad.Actions.WindowNavigation
@@ -15,48 +22,56 @@ import XMonad.Actions.Minimize
 import XMonad.Config.Desktop
 import XMonad.Hooks.EwmhDesktops
 import XMonad.Hooks.ManageDocks
-import XMonad.Layout.GridVariants as G
-import XMonad.Layout.HintedTile
-import XMonad.Layout.Minimize
-import XMonad.Layout.NoBorders
-import XMonad.Layout.ResizableTile
-import XMonad.Layout.Spacing
-import XMonad.Layout.TwoPanePersistent
+import qualified XMonad.Layout.GridVariants as G
+-- import XMonad.Layout.HintedTile
+
+-- import XMonad.Layout.ResizableTile
+
+-- import XMonad.Layout.TwoPanePersistent
+
+-- import qualified XMonad.Layout.Grid as Grid
+import XMonad.Layout.LayoutHints (layoutHints)
+import XMonad.Layout.Minimize (minimize)
+import XMonad.Layout.NoBorders (smartBorders)
+import XMonad.Layout.Spacing (Border (..), spacingRaw)
 import qualified XMonad.StackSet as W
 import qualified XMonad.Util.ExtensibleState as XS
 import qualified XMonad.Util.Minimize as Min
 
 stepSize = 1 / 10
 
+main :: IO ()
 main =
   xmonad $
     ewmh
       desktopConfig
         { layoutHook =
-            minimize . avoidStruts . smartBorders
+            minimize . avoidStruts . smartBorders . layoutHints
               . spacingRaw True (Border 8 8 8 8) True (Border 8 8 8 8) True
               $
               -- Tall { tallNMaster = 1, tallRatio = 1/2, tallRatioIncrement = stepSize }
               -- Mirror (StackTile 2 stepSize (8/10))
               -- TallGrid 1 2 (8/10) (16/10) stepSize
-              HintedTile
-                { nmaster = 2,
-                  delta = stepSize,
-                  frac = 4 / 5,
-                  alignment = TopLeft,
-                  orientation = Wide
-                }
-                ||| Mirror
-                  ( HintedTile
-                      { nmaster = 2,
-                        delta = 1 / 12,
-                        frac = 6 / 12,
-                        alignment = TopLeft,
-                        orientation = Wide
-                      }
-                  )
-                ||| TwoPanePersistent {slaveWin = Nothing, dFrac = stepSize, mFrac = 3 / 5},
-          -- -- ||| Full
+              -- HintedTile
+              --   { nmaster = 2,
+              --     delta = stepSize,
+              --     frac = 4 / 5,
+              --     alignment = TopLeft,
+              --     orientation = Wide
+              --   }
+              --   ||| Mirror
+              --     ( HintedTile
+              --         { nmaster = 2,
+              --           delta = 1 / 12,
+              --           frac = 6 / 12,
+              --           alignment = TopLeft,
+              --           orientation = Wide
+              --         }
+              --     )
+              --   ||| TwoPanePersistent {slaveWin = Nothing, dFrac = stepSize, mFrac = 2 / 5},
+              -- -- ||| Full,
+              -- LinguiniLayout {masterSide = RightSide, frac = 3 / 5, aspectRatio = 16/9},
+              Mirror $ G.SplitGrid G.B 1 1 (3 / 5) (9 / 16) stepSize,
           modMask = mod4Mask,
           keys = myKeys,
           normalBorderColor = "#222222",
@@ -115,7 +130,10 @@ myKeys conf@XConfig {XMonad.modMask = modMask} =
       ),
       -- quit, or restart
       ((modMask .|. shiftMask, xK_q), io exitSuccess), -- %! Quit xmonad
-      ((modMask, xK_q), spawn "if type xmonad; then xmonad --recompile && xmonad --restart; else zenity --info --text=xmonad not in \\$PATH: \"$PATH\"; fi") -- %! Restart xmonad
+      ( (modMask, xK_q),
+        spawn
+          "if type xmonad; then xmonad --recompile && xmonad --restart; else zenity --info --text=xmonad not in \\$PATH: \"$PATH\"; fi" -- %! Restart xmonad
+      )
     ]
 
 -- ++
@@ -130,3 +148,28 @@ myKeys conf@XConfig {XMonad.modMask = modMask} =
 -- [((m .|. modMask, key), screenWorkspace sc >>= flip whenJust (windows . f))
 --     | (key, sc) <- zip [xK_w, xK_e, xK_r] [0..]
 --     , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]]
+
+-- data LinguiniLayout a = LinguiniLayout {masterSide :: Sides, frac :: Rational, aspectRatio :: Rational}
+--   deriving (Read, Show)
+
+-- data Sides = LeftSide | RightSide
+--   deriving (Read, Show)
+
+-- instance LayoutClass LinguiniLayout a where
+--   doLayout l@LinguiniLayout {masterSide, frac, aspectRatio} display windows = do
+--     let masterR, restR :: Rectangle
+--         (masterR, restR) =
+--           ( case masterSide of
+--               LeftSide -> splitHorizontallyBy frac display
+--               RightSide -> swap $ splitHorizontallyBy (1 - frac) display
+--           )
+--         masterW :: a
+--         restWs :: [a]
+--         (masterW, restWs) = popMaster windows
+--     case restWs of
+--       [] -> pure ([(masterW, display)], Nothing)
+--       _ -> pure ((masterW, masterR) : Grid.arrange (fromRational aspectRatio) restR restWs, Nothing)
+
+-- popMaster :: W.Stack a -> (a, [a])
+-- popMaster W.Stack {W.up = u : us, W.focus, W.down} = popMaster W.Stack {W.up = us, W.focus = u, W.down = focus : down}
+-- popMaster W.Stack {W.up = [], W.focus, W.down} = (focus, down)
