@@ -78,8 +78,8 @@ main =
           focusedBorderColor = "#FFB53A",
           borderWidth = 3,
           startupHook = setFullscreenSupported,
-          handleEventHook = handleEventHook desktopConfig <+> fullscreenEventHook,
-          workspaces = []
+          handleEventHook = handleEventHook desktopConfig <+> fullscreenEventHook --,
+          -- workspaces = []
         }
 
 -- https://www.reddit.com/r/xmonad/comments/gc4b9i/what_is_the_best_way_to_make_xmonad_respect_true/fpbnsv9/?utm_source=reddit&utm_medium=web2x&context=3
@@ -97,7 +97,7 @@ addSupported props = withDisplay $ \dpy -> do
 
 myKeys :: XConfig Layout -> M.Map (KeyMask, KeySym) (X ())
 myKeys conf@XConfig {XMonad.modMask = modMask} =
-  M.fromList
+  M.fromList $
     -- launching and killing programs
     [ ((modMask .|. shiftMask, xK_c), kill), -- %! Close the focused window
       ((modMask, xK_space), sendMessage NextLayout), -- %! Rotate through the available layout algorithms
@@ -135,13 +135,14 @@ myKeys conf@XConfig {XMonad.modMask = modMask} =
           "if type xmonad; then xmonad --recompile && xmonad --restart; else zenity --info --text=xmonad not in \\$PATH: \"$PATH\"; fi" -- %! Restart xmonad
       )
     ]
+      ++
+      -- mod-[1..9] %! Switch to workspace N
+      -- mod-shift-[1..9] %! Move client to workspace N
+      [ ((m .|. modMask, k), windows $ f i)
+        | (i, k) <- zip (XMonad.workspaces conf) [xK_1 .. xK_9],
+          (f, m) <- [(W.greedyView, 0), (W.shift, shiftMask)]
+      ]
 
--- ++
--- -- mod-[1..9] %! Switch to workspace N
--- -- mod-shift-[1..9] %! Move client to workspace N
--- [((m .|. modMask, k), windows $ f i)
---     | (i, k) <- zip (XMonad.workspaces conf) [xK_1 .. xK_9]
---     , (f, m) <- [(W.greedyView, 0), (W.shift, shiftMask)]]
 -- ++
 -- -- mod-{w,e,r} %! Switch to physical/Xinerama screens 1, 2, or 3
 -- -- mod-shift-{w,e,r} %! Move client to screen 1, 2, or 3
